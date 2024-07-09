@@ -9,11 +9,14 @@ from const import *
 
 class SensorUpdator:
 
-    def __init__(self, base_url: str, token: str):
+    def __init__(self, base_url: str, token: str, enable: bool):
         self.base_url = base_url[:-1] if base_url.endswith("/") else base_url
         self.token = token
+        self.enable = enable
 
     def update(self, sensorName: str, present_date: str or None, sensorState: float, sensorUnit: str, month=False):
+        if self.enable is False:
+            return
         """
         Update the sensor state
         :param sensorName: 此为id，不是name

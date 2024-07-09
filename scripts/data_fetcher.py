@@ -75,7 +75,7 @@ def _get_tracks(distance):
     print("sum(tracks) is {}, sum(tracks) - distance is {}",sum(tracks),sum(tracks)-round(distance*1.02))
     tracks.append(sum(tracks)-distance)
     logging.info(f"image tracks distance is {sum(tracks)}")
-    return tracks 
+    return tracks
 
 def base64_to_PLI(base64_str: str):
     base64_data = re.sub('^data:image/.+;base64,', '', base64_str)
@@ -196,6 +196,7 @@ class DataFetcher:
         self.RETRY_TIMES_LIMIT = int(os.getenv("RETRY_TIMES_LIMIT"))
         self.LOGIN_EXPECTED_TIME = int(os.getenv("LOGIN_EXPECTED_TIME"))
         self.RETRY_WAIT_TIME_OFFSET_UNIT = int(os.getenv("RETRY_WAIT_TIME_OFFSET_UNIT"))
+        self.HASS_ENABLE = os.getenv("HASS_ENABLE", "false").lower == "true"
 
     def base64_api(self, b64, typeid=33):
         data = {"username": self._tujian_uname, "password": self._tujian_passwd, "typeid": typeid, "image": b64}
@@ -254,8 +255,8 @@ class DataFetcher:
             driver = webdriver.Edge(executable_path=driverfile_path)
         else:
             driver = self._get_webdriver()
-        
-        driver.maximize_window() 
+
+        driver.maximize_window()
         time.sleep(self.RETRY_WAIT_TIME_OFFSET_UNIT)
         logging.info("Webdriver initialized.")
 
@@ -281,7 +282,7 @@ class DataFetcher:
             driver.quit()
 
             logging.info("Webdriver quit after fetching data successfully.")
-            return user_id_list, balance_list, last_daily_date_list, last_daily_usage_list, yearly_charge_list, yearly_usage_list, month_list, month_usage_list, month_charge_list 
+            return user_id_list, balance_list, last_daily_date_list, last_daily_usage_list, yearly_charge_list, yearly_usage_list, month_list, month_usage_list, month_charge_list
 
         finally:
             driver.quit()
@@ -328,8 +329,8 @@ class DataFetcher:
             background_JS = 'return document.getElementById("slideVerify").childNodes[0].toDataURL("image/png");'
             targe_JS = 'return document.getElementsByClassName("slide-verify-block")[0].toDataURL("image/png");'
             # get base64 image data
-            im_info = driver.execute_script(background_JS) 
-            background = im_info.split(',')[1]  
+            im_info = driver.execute_script(background_JS)
+            background = im_info.split(',')[1]
             background_image = base64_to_PLI(background)
             logging.info(f"Get electricity canvas image successfully.\r")
             distance = self.onnx.get_distance(background_image)
@@ -353,12 +354,12 @@ class DataFetcher:
                         f"Login failed, maybe caused by invalid captcha, {self.RETRY_TIMES_LIMIT - retry_times} retry times left.")
             else:
                 return False
-        
+
         logging.error(f"Login failed, maybe caused by Sliding CAPTCHA recognition failed")
         raise Exception(
             "Login failed, maybe caused by 1.incorrect phone_number and password, please double check. or 2. network, please mnodify LOGIN_EXPECTED_TIME in .env and run docker compose up --build.")
         return True
-        
+
     def _get_electric_balances(self, driver, user_id_list):
 
         balance_list = []
@@ -385,6 +386,8 @@ class DataFetcher:
         return balance_list
 
     def _get_other_data(self, driver, user_id_list):
+        if self.HASS_ENABLE is False:
+            return None, None, None, None, None, None, None
         last_daily_date_list = []
         last_daily_usage_list = []
         yearly_usage_list = []
@@ -618,7 +621,7 @@ class DataFetcher:
         logging.info(f"chromium-driver version is {version}")
         return int(version)
 
-    @staticmethod 
+    @staticmethod
     def _sliding_track(driver, distance):# 机器模拟人工滑动轨迹
         # 获取按钮
         slider = driver.find_element(By.CLASS_NAME, "slide-verify-slider-mask-item")
