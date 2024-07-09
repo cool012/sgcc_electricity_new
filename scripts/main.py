@@ -7,13 +7,12 @@ import traceback
 from datetime import datetime,timedelta
 
 import dotenv
+import requests
 import schedule
 
 from const import *
 from data_fetcher import DataFetcher
 from sensor_updator import SensorUpdator
-
-from scripts.notifier.base_notifier import BaseNotifier
 
 BALANCE = 0.0
 PUSHPLUS_TOKEN = []
@@ -24,7 +23,8 @@ NOTIFY_TYPE = None
 TELEGRAM_TOKEN = None
 # Telegram chat id
 TELEGRAM_CHAT_ID = 0
-
+# ServerChan SendKey
+SERVER_CHAN_SEND_KEY = None
 
 def main():
     # 读取 .env 文件
@@ -35,6 +35,7 @@ def main():
     global NOTIFY_TYPE
     global TELEGRAM_TOKEN
     global TELEGRAM_CHAT_ID
+    global SERVER_CHAN_SEND_KEY
     try:
         PHONE_NUMBER = os.getenv("PHONE_NUMBER")
         PASSWORD = os.getenv("PASSWORD")
@@ -46,8 +47,9 @@ def main():
         VERSION = os.getenv("VERSION")
         BALANCE = float(os.getenv("BALANCE"))
         NOTIFY_TYPE = os.getenv("NOTIFY_TYPE")
-        TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+        TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
         TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+        SERVER_CHAN_SEND_KEY = os.getenv("SERVER_CHAN_SEND_KEY")
         PUSHPLUS_TOKEN = os.getenv("PUSHPLUS_TOKEN").split(",")
         RECHARGE_NOTIFY = os.getenv("RECHARGE_NOTIFY", "false").lower() == "true"
     except Exception as e:
@@ -83,15 +85,15 @@ def run_task(data_fetcher: DataFetcher, sensor_updator: SensorUpdator):
                     send_notify(user_id_list[i], balance_list[i])
                     logging.info(
                         f'The current balance of user id {user_id_list[i]} is {balance_list[i]} CNY less than {BALANCE}CNY, notice has been sent, please pay attention to check and recharge.')
-            if last_daily_usage_list[i] is not None:
+            if last_daily_usage_list is not None and last_daily_usage_list[i] is not None:
                 sensor_updator.update(DAILY_USAGE_SENSOR_NAME + profix, last_daily_date_list[i], last_daily_usage_list[i], USAGE_UNIT)
-            if yearly_usage_list[i] is not None:
+            if yearly_usage_list is not None and yearly_usage_list[i] is not None:
                 sensor_updator.update(YEARLY_USAGE_SENSOR_NAME + profix, None, yearly_usage_list[i], USAGE_UNIT)
-            if yearly_charge_list[i] is not None:
+            if yearly_charge_list is not None and yearly_charge_list[i] is not None:
                 sensor_updator.update(YEARLY_CHARGE_SENSOR_NAME + profix, None, yearly_charge_list[i], BALANCE_UNIT)
-            if month_charge_list[i] is not None:
+            if month_charge_list is not None and month_charge_list[i] is not None:
                 sensor_updator.update(MONTH_CHARGE_SENSOR_NAME + profix, month_list[i], month_charge_list[i], BALANCE_UNIT, month=True)
-            if month_usage_list[i] is not None:
+            if month_usage_list is not None and month_usage_list[i] is not None:
                 sensor_updator.update(MONTH_USAGE_SENSOR_NAME + profix, month_list[i], month_usage_list[i], USAGE_UNIT, month=True)
         logging.info("state-refresh task run successfully!")
     except Exception as e:
@@ -110,12 +112,29 @@ def logger_init(level: str):
 
 
 def send_notify(user_id, balance):
-    args = {
-        'pushplus_token': PUSHPLUS_TOKEN,
-        'telegram_token': TELEGRAM_TOKEN,
-        'telegram_chat_id': TELEGRAM_CHAT_ID
-    }
-    BaseNotifier(user_id, balance).sendNotify(NOTIFY_TYPE, args)
+    if NOTIFY_TYPE is None:
+        return
+    if NOTIFY_TYPE == 'PushPlus':
+        for t in PUSHPLUS_TOKEN:
+            title = '电费余额不足提醒'
+            content = f'您用户号{user_id}的当前电费余额为：{balance}元，请及时充值。'
+            url = 'http://www.pushplus.plus/send?token=' + t + '&title=' + title + '&content=' + content
+            response = requests.get(url)
+            response.raise_for_status()
+    elif NOTIFY_TYPE == 'Telegram':
+        url = 'https://api.telegram.org/bot{}/sendMessage'.format(TELEGRAM_TOKEN)
+        text = f"[电费余额不足提醒] 当前电费余额为：{balance}元，请及时充值。"
+        data = {
+            'chat_id': TELEGRAM_CHAT_ID,
+            'text': text
+        }
+        response = requests.post(url=url, json=data)
+        response.raise_for_status()
+    elif NOTIFY_TYPE == 'ServerChan':
+        text = f"[电费余额不足提醒] 当前电费余额为：{balance}元，请及时充值。"
+        url = 'https://sctapi.ftqq.com/{}.send?title={}'.format(SERVER_CHAN_SEND_KEY, text)
+        response = requests.get(url=url)
+        response.raise_for_status()
 
 
 if __name__ == "__main__":

@@ -106,6 +106,8 @@
    # COLLECTION_NAME默认为electricity_daily_usage_{国网用户id}，不支持修改。
 
    ## homeassistant配置
+   # 是否开启连接 homeassistant，为 False 不会查询电量使用信息，只会查询余额
+   HASS_ENABLE=True
    # 改为你的localhost为你的homeassistant地址
    HASS_URL="http://localhost:8123/" 
    # homeassistant的长期令牌
@@ -138,8 +140,16 @@
    RECHARGE_NOTIFY=Flase
    # 余额
    BALANCE=5.0
-   # pushplus token 如果有多个就用","分隔，","之间不要有空格，单个就不要有","
+   # 通知类型，可选 PUSHPLUS、Telegram、ServerChan
+   NOTIFY_TYPE=Telegram
+   # pushplus token 如果有多个就用","分隔，","之间不要有空格
    PUSHPLUS_TOKEN=xxxxxxx,xxxxxxx,xxxxxxx
+   # Telegram bot token
+   TELEGRAM_BOT_TOKEN=
+   # Telegram chat id
+   TELEGRAM_CHAT_ID=
+   # Server Chan SendKey
+   SERVER_CHAN_SEND_KEY=
    ```
 4. 运行
 
